@@ -1,0 +1,71 @@
+[package]
+name = "smithyq"
+version = "0.1.0"
+edition = "2024"
+authors = ["Andrea Bellomia <andreabellomia 2001@gmail.com>"]
+license = "MIT"
+description = "A high-performance async task worker library for Rust - forge your tasks with type safety"
+documentation = "https://docs.rs/smithyq"
+repository = "https://github.com/AndreaBellomia/smithyq"
+homepage = "https://github.com/AndreaBellomia/smithyq"
+readme = "README.md"
+keywords = ["async", "worker", "task", "queue", "tokio", "job"]
+categories = ["asynchronous", "concurrency", "web-programming"]
+exclude = ["examples/*", "benches/*", ".github/*"]
+
+[dependencies]
+tokio = { version = "1.45.0", features = [
+    "rt",
+    "macros",
+    "rt-multi-thread",
+    "sync",
+    "signal",
+] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0.140"
+async-trait = "0.1.88"
+tracing = "0.1.41"
+tracing-subscriber = "0.3.19"
+thiserror = "2.0.12"
+uuid = { version = "1.17.0", features = ["v4"] }
+paste = "1.0.15"
+futures = "0.3.31"
+redis = { version = "0.31.0", optional = true }
+sqlx = { version = "0.8.6", features = [
+    "postgres",
+    "runtime-tokio-rustls",
+    "uuid",
+    "chrono",
+], optional = true }
+prometheus = { version = "0.14.0", optional = true }
+chrono = { version = "0.4.41", features = ["serde"], optional = true }
+num_cpus = "1.16.0"
+
+[features]
+redis = ["dep:redis"]
+prometheus = ["dep:prometheus"]
+chrono = ["dep:chrono"]
+
+[dev-dependencies]
+criterion = { version = "0.6.0", features = ["html_reports"] }
+tokio-test = "0.4.4"
+tracing-subscriber = "0.3.19"
+
+
+# [features]
+# default = ["in-memory"]
+# full = ["redis-queue", "postgres-queue", "metrics", "scheduling"]
+# in-memory = []
+# redis-queue = ["redis", "chrono"]
+# postgres-queue = ["sqlx", "chrono"]
+# metrics = ["prometheus"]
+# scheduling = ["chrono"]
+
+
+# [[bench]]
+# name = "backoff_performance"
+# harness = false
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
