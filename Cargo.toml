@@ -9,7 +9,7 @@ documentation = "https://docs.rs/smithyq"
 repository = "https://github.com/AndreaBellomia/smithyq"
 homepage = "https://github.com/AndreaBellomia/smithyq"
 readme = "README.md"
-keywords = ["async", "worker", "task", "queue", "tokio", "job"]
+keywords = ["worker", "task", "queue", "tokio", "job"]
 categories = ["asynchronous", "concurrency", "web-programming"]
 exclude = ["examples/*", "benches/*", ".github/*"]
 
