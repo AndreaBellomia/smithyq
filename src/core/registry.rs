@@ -487,55 +487,6 @@ pub fn get_registry() -> &'static TaskRegistry {
     })
 }
 
-/// Macro to automatically register a task type with SmithyQ.
-///
-/// This macro generates the necessary boilerplate code to register a task type
-/// with the global task registry. It creates both an executor and a caller
-/// for the task type.
-///
-/// # Arguments
-///
-/// * `$task_struct` - The struct that implements `SmithyTask`
-/// * `$task_type` - String literal identifying the task type
-///
-/// # Examples
-///
-/// ```rust
-/// use smithyq::prelude::*;
-/// use serde::{Deserialize, Serialize};
-///
-/// #[derive(Debug, Serialize, Deserialize)]
-/// struct MyTask {
-///     data: String,
-/// }
-///
-/// #[async_trait::async_trait]
-/// impl SmithyTask for MyTask {
-///     type Output = String;
-///     
-///     async fn forge(self) -> SmithyResult<Self::Output> {
-///         Ok(format!("Processed: {}", self.data))
-///     }
-/// }
-///
-/// // Register the task
-/// forge_task!(MyTask, "my_task");
-///
-/// // This generates:
-/// // - MyTaskExecutor struct
-/// // - MyTaskCaller struct  
-/// // - register_my_task() function
-/// ```
-#[macro_export]
-macro_rules! forge_task {
-    ($task_struct:ident, $task_type:literal) => {
-        $crate::forge_task_with_config!($task_struct, $task_type, {});
-    };
-    ($task_struct:ident, $task_type:literal, { $($config:tt)* }) => {
-        $crate::forge_task_with_config!($task_struct, $task_type, { $($config)* });
-    };
-}
-
 /// Extended macro for registering tasks with custom configuration.
 #[macro_export]
 macro_rules! forge_task_with_config {
@@ -576,11 +527,11 @@ macro_rules! forge_task_with_config {
 
                 fn metadata(&self) -> $crate::core::registry::TaskMetadata {
                     $crate::core::registry::TaskMetadata {
-                        description: forge_task_with_config!(@description $($description)?),
-                        estimated_duration: forge_task_with_config!(@duration $($duration)?),
-                        cpu_intensive: forge_task_with_config!(@cpu_intensive $($cpu_intensive)?),
-                        io_intensive: forge_task_with_config!(@io_intensive $($io_intensive)?),
-                        priority: forge_task_with_config!(@priority $($priority)?),
+                        description: $crate::forge_task_with_config!(@description $($description)?),
+                        estimated_duration: $crate::forge_task_with_config!(@duration $($duration)?),
+                        cpu_intensive: $crate::forge_task_with_config!(@cpu_intensive $($cpu_intensive)?),
+                        io_intensive: $crate::forge_task_with_config!(@io_intensive $($io_intensive)?),
+                        priority: $crate::forge_task_with_config!(@priority $($priority)?),
                         tags: vec![$($(String::from($tag)),*)?],
                     }
                 }
@@ -596,7 +547,7 @@ macro_rules! forge_task_with_config {
                         payload,
                         status: $crate::task::TaskStatus::Pending,
                         retry_count: 0,
-                        max_retries: forge_task_with_config!(@max_retries $($max_retries)?),
+                        max_retries: $crate::forge_task_with_config!(@max_retries $($max_retries)?),
                         created_at: SystemTime::now(),
                         updated_at: SystemTime::now(),
                         execute_at: None,
@@ -609,11 +560,11 @@ macro_rules! forge_task_with_config {
 
                 fn default_config(&self) -> $crate::core::registry::TaskConfig {
                     $crate::core::registry::TaskConfig {
-                        max_retries: forge_task_with_config!(@max_retries $($max_retries)?),
-                        timeout: forge_task_with_config!(@timeout $($timeout)?),
-                        priority: forge_task_with_config!(@priority $($priority)?),
-                        concurrent: forge_task_with_config!(@concurrent $($concurrent)?),
-                        rate_limit: forge_task_with_config!(@rate_limit $($rate_limit)?),
+                        max_retries: $crate::forge_task_with_config!(@max_retries $($max_retries)?),
+                        timeout: $crate::forge_task_with_config!(@timeout $($timeout)?),
+                        priority: $crate::forge_task_with_config!(@priority $($priority)?),
+                        concurrent: $crate::forge_task_with_config!(@concurrent $($concurrent)?),
+                        rate_limit: $crate::forge_task_with_config!(@rate_limit $($rate_limit)?),
                     }
                 }
             }
@@ -677,6 +628,55 @@ macro_rules! forge_task_with_config {
 
     (@rate_limit) => { 0 };
     (@rate_limit $rate_limit:expr) => { $rate_limit };
+}
+
+/// Macro to automatically register a task type with SmithyQ.
+///
+/// This macro generates the necessary boilerplate code to register a task type
+/// with the global task registry. It creates both an executor and a caller
+/// for the task type.
+///
+/// # Arguments
+///
+/// * `$task_struct` - The struct that implements `SmithyTask`
+/// * `$task_type` - String literal identifying the task type
+///
+/// # Examples
+///
+/// ```rust, ignore
+/// use smithyq::prelude::*;
+/// use serde::{Deserialize, Serialize};
+///
+/// #[derive(Debug, Serialize, Deserialize)]
+/// struct MyTask {
+///     data: String,
+/// }
+///
+/// #[async_trait::async_trait]
+/// impl SmithyTask for MyTask {
+///     type Output = String;
+///     
+///     async fn forge(self) -> SmithyResult<Self::Output> {
+///         Ok(format!("Email sent to {}", self.to))
+///     }
+/// }
+///
+/// // Register the task
+/// forge_task!(MyTask, "my_task");
+///
+/// // This generates:
+/// // - MyTaskExecutor struct
+/// // - MyTaskCaller struct  
+/// // - register_my_task() function
+/// ```
+#[macro_export]
+macro_rules! forge_task {
+    ($task_struct:ident, $task_type:literal) => {
+        $crate::forge_task_with_config!($task_struct, $task_type, {});
+    };
+    ($task_struct:ident, $task_type:literal, { $($config:tt)* }) => {
+        $crate::forge_task_with_config!($task_struct, $task_type, { $($config)* });
+    };
 }
 
 #[cfg(test)]

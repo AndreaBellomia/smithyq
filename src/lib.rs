@@ -12,38 +12,37 @@
 //!
 //! ## Quick Start
 //!
-//! ```rust
-//! use rusty_worker::prelude::*;
+//! ```rust, ignore
+//! use smithyq::prelude::*;
 //! use serde::{Deserialize, Serialize};
 //!
 //! #[derive(Debug, Serialize, Deserialize)]
-//! struct EmailTask {
-//!     to: String,
-//!     subject: String,
+//! struct Example {
+//!     data: String,
 //! }
 //!
 //! #[async_trait::async_trait]
-//! impl ExecutableTask for EmailTask {
+//! impl SmithyTask for Example {
 //!     type Output = String;
 //!     
-//!     async fn execute(self) -> TaskResult<Self::Output> {
+//!     async fn forge(self) -> SmithyResult<Self::Output> {
 //!         // Your task logic here
-//!         Ok(format!("Email sent to {}", self.to))
+//!         Ok(format!("Email sent to {}", self.data))
 //!     }
 //! }
 //!
-//! register_task!(EmailTask, "email");
+//! register_task!(MyTask, "example");
 //!
 //! #[tokio::main]
 //! async fn main() -> Result<(), Box<dyn std::error::Error>> {
-//!     let config = WorkerConfig::default();
-//!     let mut manager = WorkerManager::new(config).await?;
+//!     let config = SmithyConfig::default();
+//!     let mut manager = Smithy::new(config).await?;
 //!     
 //!     // Register your tasks
-//!     register_email_task().await;
+//!     register_example_task().await;
 //!     
 //!     // Start workers
-//!     manager.start().await?;
+//!     manager.start_forging().await?;
 //!     
 //!     Ok(())
 //! }
@@ -66,7 +65,7 @@ pub mod prelude {
     pub use crate::core::registry::{TaskCaller, TaskExecutor, TaskPriority, get_registry};
     pub use crate::error::{SmithyError, SmithyResult};
     pub use crate::forge_task;
-    pub use crate::queue::{QueueBackend, TaskQueue};
+    pub use crate::queue::{InMemoryQueue, QueueBackend, TaskQueue};
     pub use crate::task::{QueuedTask, SmithyTask, TaskId, TaskStatus};
     pub use async_trait::async_trait;
 

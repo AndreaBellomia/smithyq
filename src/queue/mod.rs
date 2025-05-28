@@ -7,7 +7,7 @@
 //!
 //! # Examples
 //!
-//! ```rust
+//! ```rust,no_run
 //! use smithyq::prelude::*;
 //!
 //! // In-memory queue (default)

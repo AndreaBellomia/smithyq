@@ -268,23 +268,27 @@ impl RetryConfig {
 ///
 /// # Examples
 ///
-/// ```rust,no_run
+/// ```rust
 /// use smithyq::utils::{retry_with_config, RetryConfig};
 /// use std::time::Duration;
+/// use std::sync::{Arc, atomic::{AtomicU32, Ordering}};
 ///
 /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 /// let config = RetryConfig::new(3)
 ///     .with_base_delay(Duration::from_millis(100))
 ///     .with_max_delay(Duration::from_secs(5));
 ///
-/// let mut counter = 0;
-/// let result = retry_with_config(config, || async {
-///     counter += 1;
-///     // Your fallible operation here
-///     if counter >= 2 {
-///         Ok("Success!")
-///     } else {
-///         Err("Simulated failure")
+/// let counter = Arc::new(AtomicU32::new(0));
+/// let result = retry_with_config(config, || {
+///     let counter = counter.clone();
+///     async move {
+///         let attempt = counter.fetch_add(1, Ordering::SeqCst) + 1;
+///         // Your fallible operation here
+///         if attempt >= 2 {
+///             Ok("Success!")
+///         } else {
+///             Err("Simulated failure")
+///         }
 ///     }
 /// }).await;
 /// # Ok(())

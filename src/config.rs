@@ -14,7 +14,8 @@ use std::time::Duration;
 /// # Examples
 ///
 /// ```rust
-/// use smithyq::config::SmithyConfig;
+/// use smithyq::config::{SmithyConfig, WorkerConfig, QueueConfig};
+///
 ///
 /// // Use default configuration
 /// let config = SmithyConfig::default();
