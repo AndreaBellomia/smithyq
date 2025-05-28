@@ -277,12 +277,14 @@ impl RetryConfig {
 ///     .with_base_delay(Duration::from_millis(100))
 ///     .with_max_delay(Duration::from_secs(5));
 ///
+/// let mut counter = 0;
 /// let result = retry_with_config(config, || async {
+///     counter += 1;
 ///     // Your fallible operation here
-///     if rand::random::<bool>() {
+///     if counter >= 2 {
 ///         Ok("Success!")
 ///     } else {
-///         Err("Random failure")
+///         Err("Simulated failure")
 ///     }
 /// }).await;
 /// # Ok(())
@@ -384,24 +386,32 @@ pub mod naming {
     ///
     /// Converts snake_case and PascalCase to space-separated words.
     pub fn humanize_task_type(task_type: &str) -> String {
-        task_type
-            .replace('_', " ")
-            .chars()
-            .enumerate()
-            .map(|(i, c)| {
-                if i > 0 && c.is_uppercase() {
-                    format!(" {}", c.to_lowercase())
-                } else {
-                    c.to_string()
-                }
-            })
-            .collect::<String>()
+        let with_spaces = task_type.replace('_', " ");
+
+        let mut result = String::new();
+        let mut prev_char: Option<char> = None;
+
+        for c in with_spaces.chars() {
+            if c.is_uppercase()
+                && !result.is_empty()
+                && !result.ends_with(' ')
+                && prev_char.map_or(false, |prev| prev.is_lowercase())
+            {
+                result.push(' ');
+            }
+            result.push(c);
+            prev_char = Some(c);
+        }
+
+        result
             .split_whitespace()
             .map(|word| {
                 let mut chars = word.chars();
                 match chars.next() {
                     None => String::new(),
-                    Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
+                    Some(first) => {
+                        first.to_uppercase().collect::<String>() + &chars.as_str().to_lowercase()
+                    }
                 }
             })
             .collect::<Vec<_>>()
@@ -412,7 +422,7 @@ pub mod naming {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::{result, time::Duration};
+    use std::time::Duration;
 
     #[test]
     fn test_calculate_backoff() {

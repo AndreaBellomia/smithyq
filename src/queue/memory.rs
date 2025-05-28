@@ -20,13 +20,6 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 use tokio::sync::RwLock;
 
-/// Task with visibility information for the in-memory queue
-#[derive(Debug, Clone)]
-struct VisibleTask {
-    task: QueuedTask,
-    visible_at: SystemTime,
-}
-
 /// In-memory queue backend implementation
 #[derive(Debug)]
 pub struct InMemoryQueue {
@@ -101,32 +94,45 @@ impl InMemoryQueue {
             }
         }
 
-        self.update_stats().await;
+        self.update_stats().await?;
         Ok(())
     }
 
     /// Update internal statistics
     async fn update_stats(&self) -> SmithyResult<()> {
-        let tasks = self.tasks.read().await;
-        let mut stats = self.stats.write().await;
+        let tasks_guard = match self.tasks.try_read() {
+            Ok(guard) => guard,
+            Err(_) => {
+                tracing::debug!("Tasks lock busy, skipping stats update");
+                return Ok(());
+            }
+        };
 
-        stats.pending = tasks
+        let mut stats_guard = match self.stats.try_write() {
+            Ok(guard) => guard,
+            Err(_) => {
+                tracing::debug!("Stats lock busy, skipping stats update");
+                return Ok(());
+            }
+        };
+
+        stats_guard.pending = tasks_guard
             .values()
             .filter(|t| t.status == TaskStatus::Pending)
             .count() as u64;
-        stats.running = tasks
+        stats_guard.running = tasks_guard
             .values()
             .filter(|t| t.status == TaskStatus::Running)
             .count() as u64;
-        stats.completed = tasks
+        stats_guard.completed = tasks_guard
             .values()
             .filter(|t| t.status == TaskStatus::Completed)
             .count() as u64;
-        stats.failed = tasks
+        stats_guard.failed = tasks_guard
             .values()
             .filter(|t| t.status == TaskStatus::Failed)
             .count() as u64;
-        stats.dead = tasks
+        stats_guard.dead = tasks_guard
             .values()
             .filter(|t| t.status == TaskStatus::Dead)
             .count() as u64;
@@ -183,7 +189,7 @@ impl QueueBackend for InMemoryQueue {
             pending_queue.push_back(task_id.clone());
         }
 
-        self.update_stats().await;
+        let _ = self.update_stats().await;
 
         tracing::debug!("Enqueued task: {}", task_id);
         Ok(task_id)
@@ -226,7 +232,7 @@ impl QueueBackend for InMemoryQueue {
                     drop(pending_queue);
                     drop(running_tasks);
 
-                    self.update_stats().await;
+                    let _ = self.update_stats().await;
                     tracing::debug!("Dequeued task: {}", task_id);
 
                     return Ok(Some(result_task));
@@ -271,7 +277,7 @@ impl QueueBackend for InMemoryQueue {
             drop(running_tasks);
             drop(completed_tasks);
 
-            self.update_stats().await;
+            let _ = self.update_stats().await;
 
             // Update total processed counter
             let mut stats = self.stats.write().await;
@@ -333,7 +339,7 @@ impl QueueBackend for InMemoryQueue {
             drop(dead_tasks);
             drop(pending_queue);
 
-            self.update_stats().await;
+            let _ = self.update_stats().await;
             Ok(())
         } else {
             Err(SmithyError::TaskNotFound {
@@ -361,7 +367,7 @@ impl QueueBackend for InMemoryQueue {
             drop(tasks);
             drop(pending_queue);
 
-            self.update_stats().await;
+            let _ = self.update_stats().await;
 
             tracing::debug!("Requeued task {} with delay: {:?}", task_id, delay);
             Ok(())
@@ -385,7 +391,7 @@ impl QueueBackend for InMemoryQueue {
             task.updated_at = SystemTime::now();
 
             drop(tasks);
-            self.update_stats().await;
+            let _ = self.update_stats().await;
             Ok(())
         } else {
             Err(SmithyError::TaskNotFound {
@@ -396,7 +402,7 @@ impl QueueBackend for InMemoryQueue {
 
     async fn stats(&self) -> SmithyResult<QueueStats> {
         // Make sure stats are up to date
-        self.update_stats().await;
+        let _ = self.update_stats().await;
         let stats = self.stats.read().await;
         Ok(stats.clone())
     }
@@ -453,7 +459,7 @@ impl QueueBackend for InMemoryQueue {
         drop(dead_tasks);
 
         if cleaned_count > 0 {
-            self.update_stats().await;
+            let _ = self.update_stats().await;
             tracing::info!("Cleaned up {} old tasks", cleaned_count);
         }
 

@@ -5,8 +5,8 @@
 
 use crate::config::SmithyConfig;
 use crate::core::registry::get_registry;
-use crate::error::{SmithyError, SmithyResult};
-use crate::task::{QueuedTask, TaskId, TaskStatus};
+use crate::error::SmithyResult;
+use crate::task::QueuedTask;
 use crate::utils::calculate_backoff;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};

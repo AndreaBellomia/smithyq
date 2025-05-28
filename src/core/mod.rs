@@ -47,6 +47,7 @@ impl Smithy {
     pub async fn new(config: SmithyConfig) -> SmithyResult<Self> {
         let queue = QueueFactory::in_memory(config.queue.clone());
 
+        println!("config: {:?}", config);
         Ok(Self {
             engine: Arc::new(RwLock::new(None)),
             queue: Arc::from(queue),

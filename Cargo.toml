@@ -46,6 +46,10 @@ num_cpus = "1.16.0"
 redis = ["dep:redis"]
 prometheus = ["dep:prometheus"]
 chrono = ["dep:chrono"]
+metrics = ["dep:prometheus"]
+postgres-queue = ["dep:sqlx", "dep:chrono"]
+redis-queue = ["dep:redis", "dep:chrono"]
+jitter = []
 
 [dev-dependencies]
 criterion = { version = "0.6.0", features = ["html_reports"] }

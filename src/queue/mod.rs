@@ -24,10 +24,9 @@
 //! ```
 
 use crate::config::QueueConfig;
-use crate::error::{SmithyError, SmithyResult};
+use crate::error::SmithyResult;
 use crate::task::{QueuedTask, TaskId, TaskStatus};
 use async_trait::async_trait;
-use std::time::SystemTime;
 
 pub mod memory;
 pub use memory::InMemoryQueue;
@@ -150,6 +149,8 @@ impl QueueFactory {
 
 #[cfg(test)]
 mod tests {
+    use std::time::SystemTime;
+
     use super::*;
     use crate::task::QueuedTask;
     use serde_json::json;

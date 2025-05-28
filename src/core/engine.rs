@@ -173,13 +173,20 @@ impl SmithyEngine {
                 }
 
                 // Try to get a task from the queue
-                let maybe_task = match queue.dequeue().await {
-                    Ok(task) => task,
-                    Err(e) => {
-                        tracing::error!("📋 Queue dequeue error: {}", e);
-                        None
-                    }
-                };
+                let maybe_task =
+                    match tokio::time::timeout(Duration::from_millis(500), queue.dequeue()).await {
+                        Ok(Ok(task)) => task,
+                        Ok(Err(e)) => {
+                            tracing::error!("📋 Queue dequeue error: {}", e);
+
+                            // TODO: Handle specific queue errors (e.g., retry logic)
+                            None
+                        }
+                        Err(e) => {
+                            tracing::error!("📋 Queue dequeue timeout: {}", e);
+                            None
+                        }
+                    };
 
                 // Send task to worker (or None if no tasks available)
                 if let Err(_) = worker_request.response_tx.send(maybe_task) {
