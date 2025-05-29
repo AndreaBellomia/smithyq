@@ -37,8 +37,6 @@ smithyq = { version = "0.1", features = ["postgres-queue"] }
 smithyq = { version = "0.1", features = ["full"] }
 
 
-// ...existing code...
-
 ## 🛣️ Roadmap - Upcoming Features
 
 ### 📋 Queue Backends
