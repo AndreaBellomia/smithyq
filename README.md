@@ -35,3 +35,32 @@ smithyq = { version = "0.1", features = ["postgres-queue"] }
 
 # For all features
 smithyq = { version = "0.1", features = ["full"] }
+
+
+// ...existing code...
+
+## 🛣️ Roadmap - Upcoming Features
+
+### 📋 Queue Backends
+- [ ] **Redis Queue**: Complete Redis backend implementation for distributed queue management
+- [ ] **RabbitMQ Queue**: Support for RabbitMQ as backend for robust and scalable messaging
+- [ ] **AWS SQS**: Integration with Amazon Simple Queue Service for cloud-native deployments
+
+### 🔧 Middleware & Extensibility
+- [ ] **Tower Integration**: Integration with Tower framework for composable middleware
+  - Logging middleware
+  - Rate limiting
+  - Authentication/Authorization
+  - Request/Response transformation
+  - Circuit breaker pattern
+
+### 🎯 Advanced Features
+- [ ] **Dead Letter Queue**: Automatic handling of failed tasks
+- [ ] **Task Prioritization**: Priority system for task execution
+- [ ] **Batch Processing**: Process tasks in batches for improved efficiency
+- [ ] **Health Checks**: Endpoints for worker status monitoring
+
+### 📊 Monitoring & Observability
+- [ ] **Prometheus Metrics**: Export metrics in Prometheus format
+- [ ] **OpenTelemetry**: Full support for distributed tracing
+- [ ] **Dashboard**: Web interface for real-time monitoring
