@@ -74,7 +74,7 @@ impl SmithyEngine {
         }
 
         tracing::info!(
-            "🔥 Starting SmithyQ engine with {} workers",
+            "Starting SmithyQ engine with {} workers",
             self.config.workers.num_workers
         );
 
@@ -101,7 +101,7 @@ impl SmithyEngine {
         self.is_running.store(true, Ordering::Relaxed);
         self.start_time = Some(Instant::now());
 
-        tracing::info!("🔥 SmithyQ engine started successfully");
+        tracing::info!("SmithyQ engine started successfully");
         Ok(())
     }
 
@@ -111,7 +111,7 @@ impl SmithyEngine {
             return Err(SmithyError::NotRunning);
         }
 
-        tracing::info!("🛑 Shutting down SmithyQ engine...");
+        tracing::info!("Shutting down SmithyQ engine...");
         self.is_shutting_down.store(true, Ordering::Relaxed);
 
         // Close worker ready channel to stop accepting new work
@@ -121,7 +121,7 @@ impl SmithyEngine {
         let shutdown_timeout =
             Duration::from_secs(self.config.workers.shutdown_timeout_secs.unwrap_or(30));
         let shutdown_result = self.worker_manager.shutdown(shutdown_timeout).await?;
-        tracing::info!("🛑 Worker shutdown result: {}", shutdown_result);
+        tracing::info!("Worker shutdown result: {}", shutdown_result);
 
         // Stop components
         if let Some(handle) = &self.dispatcher_handle {
@@ -137,7 +137,7 @@ impl SmithyEngine {
         self.is_running.store(false, Ordering::Relaxed);
         self.is_shutting_down.store(false, Ordering::Relaxed);
 
-        tracing::info!("🛑 SmithyQ engine shutdown complete");
+        tracing::info!("SmithyQ engine shutdown complete");
         Ok(())
     }
 
@@ -146,10 +146,10 @@ impl SmithyEngine {
         // Wait for Ctrl+C or other shutdown signal
         tokio::select! {
             _ = tokio::signal::ctrl_c() => {
-                tracing::info!("🛑 Received Ctrl+C, initiating graceful shutdown...");
+                tracing::info!("Received Ctrl+C, initiating graceful shutdown...");
             }
             _ = self.wait_for_component_failure() => {
-                tracing::warn!("🛑 Component failure detected, initiating shutdown...");
+                tracing::warn!("Component failure detected, initiating shutdown...");
             }
         }
 
@@ -165,7 +165,7 @@ impl SmithyEngine {
         let is_shutting_down = Arc::clone(&self.is_shutting_down);
 
         tokio::spawn(async move {
-            tracing::info!("📋 Task dispatcher started");
+            tracing::info!("Task dispatcher started");
 
             while let Some(worker_request) = worker_ready_rx.recv().await {
                 if is_shutting_down.load(Ordering::Relaxed) {
@@ -177,27 +177,24 @@ impl SmithyEngine {
                     match tokio::time::timeout(Duration::from_millis(500), queue.dequeue()).await {
                         Ok(Ok(task)) => task,
                         Ok(Err(e)) => {
-                            tracing::error!("📋 Queue dequeue error: {}", e);
+                            tracing::error!("Queue dequeue error: {}", e);
 
                             // TODO: Handle specific queue errors (e.g., retry logic)
                             None
                         }
                         Err(e) => {
-                            tracing::error!("📋 Queue dequeue timeout: {}", e);
+                            tracing::error!("Queue dequeue timeout: {}", e);
                             None
                         }
                     };
 
                 // Send task to worker (or None if no tasks available)
                 if let Err(_) = worker_request.response_tx.send(maybe_task) {
-                    tracing::warn!(
-                        "📋 Failed to send task to worker {}",
-                        worker_request.worker_id
-                    );
+                    tracing::warn!("Failed to send task to worker {}", worker_request.worker_id);
                 }
             }
 
-            tracing::info!("📋 Task dispatcher stopped");
+            tracing::info!("Task dispatcher stopped");
         })
     }
 
@@ -209,7 +206,7 @@ impl SmithyEngine {
         let is_shutting_down = Arc::clone(&self.is_shutting_down);
 
         tokio::spawn(async move {
-            tracing::info!("👁️ Worker supervisor started");
+            tracing::info!("Worker supervisor started");
 
             let mut restart_counts: std::collections::HashMap<usize, u32> =
                 std::collections::HashMap::new();
@@ -234,7 +231,7 @@ impl SmithyEngine {
                 *restart_count += 1;
 
                 tracing::warn!(
-                    "👁️ Worker {} died ({:?}), restarting... (restart #{})",
+                    "Worker {} died ({:?}), restarting... (restart #{})",
                     worker_id,
                     dead_worker.cause,
                     restart_count
@@ -243,7 +240,7 @@ impl SmithyEngine {
                 // Exponential backoff for restarts
                 if *restart_count > 1 {
                     let backoff_secs = calculate_backoff(*restart_count, 1);
-                    tracing::info!("👁️ Backing off {}ms before restart", backoff_secs);
+                    tracing::info!("Backing off {}ms before restart", backoff_secs);
                     sleep(Duration::from_millis(backoff_secs)).await;
                 }
 
@@ -252,13 +249,13 @@ impl SmithyEngine {
                     .restart_worker(worker_id, worker_ready_tx.clone())
                     .await
                 {
-                    tracing::error!("👁️ Failed to restart worker {}: {}", worker_id, e);
+                    tracing::error!("Failed to restart worker {}: {}", worker_id, e);
                 }
 
                 // Reset restart count if too high (circuit breaker)
                 if *restart_count > 100 {
                     tracing::error!(
-                        "👁️ Too many restarts for worker {} ({}), pausing supervision",
+                        "Too many restarts for worker {} ({}), pausing supervision",
                         worker_id,
                         restart_count
                     );
@@ -267,7 +264,7 @@ impl SmithyEngine {
                 }
             }
 
-            tracing::info!("👁️ Worker supervisor stopped");
+            tracing::info!("Worker supervisor stopped");
         })
     }
 
@@ -280,7 +277,7 @@ impl SmithyEngine {
         let start_time = Instant::now();
 
         tokio::spawn(async move {
-            tracing::info!("📊 Health monitor started");
+            tracing::info!("Health monitor started");
 
             let mut interval = interval(Duration::from_secs(30));
 
@@ -297,7 +294,7 @@ impl SmithyEngine {
                 let queue_stats = match queue.stats().await {
                     Ok(stats) => stats,
                     Err(e) => {
-                        tracing::error!("📊 Failed to get queue stats: {}", e);
+                        tracing::error!("Failed to get queue stats: {}", e);
                         continue;
                     }
                 };
@@ -311,7 +308,7 @@ impl SmithyEngine {
                 };
 
                 tracing::info!(
-                    "📊 HEALTH CHECK - Status: {} | Workers: {}/{} | Queue: P:{} R:{} C:{} F:{} D:{} | Uptime: {:?}",
+                    "HEALTH CHECK - Status: {} | Workers: {}/{} | Queue: P:{} R:{} C:{} F:{} D:{} | Uptime: {:?}",
                     health_status,
                     active_count,
                     expected_workers,
@@ -324,13 +321,13 @@ impl SmithyEngine {
                 );
 
                 if active_count == 0 {
-                    tracing::error!("📊 CRITICAL: All workers are dead!");
+                    tracing::error!("CRITICAL: All workers are dead!");
                 }
 
                 // Log worker performance stats
                 if worker_stats.tasks_completed > 0 {
                     tracing::debug!(
-                        "📊 Worker performance - Completed: {} | Failed: {} | Restarts: {} | Avg duration: {:?}",
+                        "Worker performance - Completed: {} | Failed: {} | Restarts: {} | Avg duration: {:?}",
                         worker_stats.tasks_completed,
                         worker_stats.tasks_failed,
                         worker_stats.worker_restarts,
@@ -339,7 +336,7 @@ impl SmithyEngine {
                 }
             }
 
-            tracing::info!("📊 Health monitor stopped");
+            tracing::info!("Health monitor stopped");
         })
     }
 
@@ -351,14 +348,14 @@ impl SmithyEngine {
                     let _ = handle;
                 }
             } => {
-                tracing::error!("📋 Dispatcher failed");
+                tracing::error!("Dispatcher failed");
             }
             _ = async {
                 if let Some(handle) = &self.supervisor_handle {
                     let _ = handle;
                 }
             } => {
-                tracing::error!("👁️ Supervisor failed");
+                tracing::error!("Supervisor failed");
             }
         }
     }
@@ -384,7 +381,7 @@ impl SmithyEngine {
 
         if active_workers < expected_workers / 2 {
             tracing::warn!(
-                "📊 Less than half of expected workers active: {}/{}",
+                "Less than half of expected workers active: {}/{}",
                 active_workers,
                 expected_workers
             );

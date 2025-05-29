@@ -311,7 +311,7 @@ where
                 if attempt < config.max_attempts {
                     let delay = config.delay_for_attempt(attempt + 1);
                     tracing::debug!(
-                        "🔄 Retry attempt {} failed, retrying in {:?}",
+                        "Retry attempt {} failed, retrying in {:?}",
                         attempt + 1,
                         delay
                     );

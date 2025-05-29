@@ -15,7 +15,9 @@ pub mod registry;
 pub mod worker;
 
 pub use engine::SmithyEngine;
-pub use registry::{TaskCaller, TaskExecutor, TaskRegistry, get_registry};
+pub use registry::{
+    TaskCaller, TaskExecutor, TaskRegistry, execute_auto_registrations, get_registry,
+};
 pub use worker::{Worker, WorkerManager, WorkerRequest, WorkerStats};
 
 /// The main Smithy worker manager.
@@ -47,7 +49,13 @@ impl Smithy {
     pub async fn new(config: SmithyConfig) -> SmithyResult<Self> {
         let queue = QueueFactory::in_memory(config.queue.clone());
 
-        println!("config: {:?}", config);
+        tracing::debug!("Executing auto-registrations...");
+        execute_auto_registrations().await;
+
+        let registry = get_registry();
+        let registered_types = registry.get_registered_types().await;
+        tracing::info!("Registered task types: {:?}", registered_types);
+
         Ok(Self {
             engine: Arc::new(RwLock::new(None)),
             queue: Arc::from(queue),
@@ -56,11 +64,17 @@ impl Smithy {
         })
     }
 
-    /// Create a new Smithy with a custom queue backend.
     pub async fn with_queue<Q: QueueBackend + 'static>(
         config: SmithyConfig,
         queue: Q,
     ) -> SmithyResult<Self> {
+        tracing::debug!("Executing auto-registrations...");
+        execute_auto_registrations().await;
+
+        let registry = get_registry();
+        let registered_types = registry.get_registered_types().await;
+        tracing::info!("Registered task types: {:?}", registered_types);
+
         Ok(Self {
             engine: Arc::new(RwLock::new(None)),
             queue: Arc::new(queue),
@@ -76,6 +90,13 @@ impl Smithy {
         let config = SmithyConfig::default();
         let queue = QueueFactory::redis(connection_string, config.queue.clone()).await?;
 
+        tracing::debug!("Executing auto-registrations...");
+        execute_auto_registrations().await;
+
+        let registry = get_registry();
+        let registered_types = registry.get_registered_types().await;
+        tracing::info!("Registered task types: {:?}", registered_types);
+
         Ok(Self {
             engine: Arc::new(RwLock::new(None)),
             queue: Arc::from(queue),
@@ -90,6 +111,13 @@ impl Smithy {
     pub async fn with_postgres(connection_string: &str) -> SmithyResult<Self> {
         let config = SmithyConfig::default();
         let queue = QueueFactory::postgres(connection_string, config.queue.clone()).await?;
+
+        tracing::debug!("Executing auto-registrations...");
+        execute_auto_registrations().await;
+
+        let registry = get_registry();
+        let registered_types = registry.get_registered_types().await;
+        tracing::info!("Registered task types: {:?}", registered_types);
 
         Ok(Self {
             engine: Arc::new(RwLock::new(None)),
@@ -136,7 +164,7 @@ impl Smithy {
         }
 
         *is_running = false;
-        tracing::info!("🔨 Smithy stopped forging");
+        tracing::info!("Smithy stopped forging");
         Ok(())
     }
 
@@ -185,7 +213,7 @@ impl Smithy {
         self.queue.enqueue(queued_task).await?;
 
         tracing::debug!(
-            "🔨 Task forged and enqueued: {} (type: {})",
+            "Task forged and enqueued: {} (type: {})",
             task_id,
             task.task_type()
         );
@@ -251,7 +279,7 @@ impl Drop for Smithy {
         // Note: We can't call async methods in Drop, so we just log a warning
         // if the smithy is still running. Users should call stop_forging() explicitly.
         tracing::warn!(
-            "🔨 Smithy dropped while potentially still running. Call stop_forging() explicitly for graceful shutdown."
+            "Smithy dropped while potentially still running. Call stop_forging() explicitly for graceful shutdown."
         );
     }
 }
@@ -262,7 +290,7 @@ mod tests {
     use crate::task::SmithyTask;
     use serde::{Deserialize, Serialize};
 
-    #[derive(Debug, Serialize, Deserialize)]
+    #[derive(Debug, Serialize, Deserialize, Default)]
     struct TestTask {
         data: String,
     }

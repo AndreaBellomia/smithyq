@@ -19,7 +19,7 @@
 //! use serde::{Deserialize, Serialize};
 //!
 //! // Define your task
-//! #[derive(Debug, Serialize, Deserialize)]
+//! #[derive(Debug, Serialize, Deserialize, Default)]
 //! struct EmailTask {
 //!     to: String,
 //!     subject: String,
@@ -38,8 +38,8 @@
 //!     }
 //! }
 //!
-//! // Register the task automatically
-//! forge_task!(EmailTask, "email");
+//! // Register the task automatically - no task_type parameter needed!
+//! forge_task!(EmailTask);
 //!
 //! # async fn send_email(to: &str, subject: &str, body: &str) -> SmithyResult<()> { Ok(()) }
 //! ```
@@ -48,6 +48,8 @@ use crate::error::{SmithyError, SmithyResult};
 use crate::task::QueuedTask;
 use async_trait::async_trait;
 use std::collections::HashMap;
+use std::future::Future;
+use std::pin::Pin;
 use std::sync::OnceLock;
 use std::time::SystemTime;
 use tokio::sync::RwLock;
@@ -204,7 +206,7 @@ pub struct TaskRegistry {
 impl TaskRegistry {
     /// Create a new empty task registry.
     fn new() -> Self {
-        tracing::debug!("🏭 Creating new task registry");
+        tracing::debug!("Creating new task registry");
         Self {
             executors: RwLock::new(HashMap::new()),
             callers: RwLock::new(HashMap::new()),
@@ -222,7 +224,7 @@ impl TaskRegistry {
         let task_type = executor.task_type().to_string();
         let metadata = executor.metadata();
 
-        tracing::info!("🏭 Registering task executor: {}", task_type);
+        tracing::info!("Registering task executor: {}", task_type);
 
         // Store executor
         self.executors
@@ -249,7 +251,7 @@ impl TaskRegistry {
         let task_type = caller.task_type().to_string();
         let config = caller.default_config();
 
-        tracing::debug!("🏭 Registering task caller: {}", task_type);
+        tracing::debug!("Registering task caller: {}", task_type);
 
         // Store caller
         self.callers.write().await.insert(task_type.clone(), caller);
@@ -272,7 +274,7 @@ impl TaskRegistry {
                 Some(_) => {} // Executor exists, continue
                 None => {
                     let error = format!("No executor found for task type: {}", task.task_type);
-                    tracing::error!("🏭 {}", error);
+                    tracing::error!("{}", error);
                     return Err(SmithyError::TaskNotFound {
                         task_type: task.task_type.clone(),
                     });
@@ -280,7 +282,7 @@ impl TaskRegistry {
             }
         };
 
-        tracing::debug!("🏭 Executing task {} of type {}", task.id, task.task_type);
+        tracing::debug!("Executing task {} of type {}", task.id, task.task_type);
 
         // Execute task
         let result = {
@@ -295,14 +297,10 @@ impl TaskRegistry {
 
         match &result {
             Ok(_) => {
-                tracing::debug!(
-                    "🏭 Task {} completed successfully in {:?}",
-                    task.id,
-                    duration
-                );
+                tracing::debug!("Task {} completed successfully in {:?}", task.id, duration);
             }
             Err(e) => {
-                tracing::error!("🏭 Task {} failed after {:?}: {}", task.id, duration, e);
+                tracing::error!("Task {} failed after {:?}: {}", task.id, duration, e);
             }
         }
 
@@ -411,7 +409,7 @@ impl TaskRegistry {
         for task_stats in stats.values_mut() {
             *task_stats = TaskTypeStats::default();
         }
-        tracing::info!("🏭 Task registry statistics reset");
+        tracing::info!("Task registry statistics reset");
     }
 
     /// Get a summary of the registry state.
@@ -452,7 +450,7 @@ impl TaskRegistry {
         stats.clear();
         configs.clear();
 
-        tracing::debug!("🏭 Task registry cleared");
+        tracing::debug!("Task registry cleared");
     }
 }
 
@@ -482,15 +480,36 @@ static TASK_REGISTRY: OnceLock<TaskRegistry> = OnceLock::new();
 /// The registry is initialized on first access.
 pub fn get_registry() -> &'static TaskRegistry {
     TASK_REGISTRY.get_or_init(|| {
-        tracing::debug!("🏭 Initializing global task registry");
+        tracing::debug!("Initializing global task registry");
         TaskRegistry::new()
     })
+}
+
+// Auto-registration system
+type AutoRegisterFn = fn() -> Pin<Box<dyn Future<Output = ()> + Send + 'static>>;
+
+static AUTO_REGISTER_FNS: OnceLock<std::sync::Mutex<Vec<AutoRegisterFn>>> = OnceLock::new();
+
+/// Add a function to be called during auto-registration
+pub fn add_auto_register_fn(f: AutoRegisterFn) {
+    let fns = AUTO_REGISTER_FNS.get_or_init(|| std::sync::Mutex::new(Vec::new()));
+    fns.lock().unwrap().push(f);
+}
+
+/// Execute all auto-registration functions
+pub async fn execute_auto_registrations() {
+    let fns = AUTO_REGISTER_FNS.get_or_init(|| std::sync::Mutex::new(Vec::new()));
+    let fns = fns.lock().unwrap().clone();
+
+    for f in fns {
+        f().await;
+    }
 }
 
 /// Extended macro for registering tasks with custom configuration.
 #[macro_export]
 macro_rules! forge_task_with_config {
-    ($task_struct:ident, $task_type:literal, {
+    ($task_struct:ident, {
         $(description = $description:literal,)?
         $(estimated_duration = $duration:expr,)?
         $(cpu_intensive = $cpu_intensive:expr,)?
@@ -522,7 +541,8 @@ macro_rules! forge_task_with_config {
                 }
 
                 fn task_type(&self) -> &'static str {
-                    $task_type
+                    // Use type_name as default implementation
+                    std::any::type_name::<$task_struct>()
                 }
 
                 fn metadata(&self) -> $crate::core::registry::TaskMetadata {
@@ -543,7 +563,7 @@ macro_rules! forge_task_with_config {
 
                     $crate::task::QueuedTask {
                         id: uuid::Uuid::new_v4().to_string(),
-                        task_type: $task_type.to_string(),
+                        task_type: std::any::type_name::<$task_struct>().to_string(),
                         payload,
                         status: $crate::task::TaskStatus::Pending,
                         retry_count: 0,
@@ -555,7 +575,8 @@ macro_rules! forge_task_with_config {
                 }
 
                 fn task_type(&self) -> &'static str {
-                    $task_type
+                    // Use type_name as default implementation
+                    std::any::type_name::<$task_struct>()
                 }
 
                 fn default_config(&self) -> $crate::core::registry::TaskConfig {
@@ -569,15 +590,6 @@ macro_rules! forge_task_with_config {
                 }
             }
 
-            /// Register this task type with the global registry
-            pub async fn [<register_ $task_struct:snake _task>]() {
-                let registry = $crate::core::registry::get_registry();
-                registry.register_executor(Box::new([<$task_struct Executor>])).await;
-                registry.register_caller(Box::new([<$task_struct Caller>])).await;
-
-                tracing::info!("🏭 Registered task type: {} ({})", $task_type, stringify!($task_struct));
-            }
-
             /// Helper for creating and enqueuing tasks of this type
             impl [<$task_struct Caller>] {
                 /// Create a new caller instance
@@ -586,10 +598,12 @@ macro_rules! forge_task_with_config {
                 }
 
                 /// Create a task from the given data
-                pub async fn call(&self, task_data: $task_struct) -> $crate::error::SmithyResult<$crate::task::QueuedTask> {
-                    let payload = serde_json::to_value(task_data)
+                #[allow(dead_code)]
+                pub(crate) async fn call(&self, task_data: $task_struct) -> $crate::error::SmithyResult<$crate::task::QueuedTask> {
+                    let payload = serde_json::to_value(&task_data)
                         .map_err(|e| $crate::error::SmithyError::SerializationError(e))?;
-                    Ok(self.create_task(payload))
+                    let task = self.create_task(payload);
+                    Ok(task)
                 }
             }
 
@@ -597,6 +611,30 @@ macro_rules! forge_task_with_config {
                 fn default() -> Self {
                     Self::new()
                 }
+            }
+
+            /// Auto-registration function
+            pub async fn [<auto_register_ $task_struct:snake>]() {
+                let registry = $crate::core::registry::get_registry();
+                registry.register_executor(Box::new([<$task_struct Executor>])).await;
+                registry.register_caller(Box::new([<$task_struct Caller>])).await;
+
+                let task_type = std::any::type_name::<$task_struct>();
+                tracing::info!("Auto-registered task type: {} ({})", task_type, stringify!($task_struct));
+            }
+
+            /// Manual registration function (for backward compatibility)
+            #[deprecated(note = "Use auto-registration instead")]
+            pub async fn [<register_ $task_struct:snake _task>]() {
+                [<auto_register_ $task_struct:snake>]().await;
+            }
+
+            /// Function to be called during initialization
+            #[ctor::ctor]
+            fn [<mark_ $task_struct:snake _for_registration>]() {
+                $crate::core::registry::add_auto_register_fn(|| {
+                    Box::pin([<auto_register_ $task_struct:snake>]())
+                });
             }
         }
     };
@@ -634,12 +672,11 @@ macro_rules! forge_task_with_config {
 ///
 /// This macro generates the necessary boilerplate code to register a task type
 /// with the global task registry. It creates both an executor and a caller
-/// for the task type.
+/// for the task type. The task_type is automatically derived from the SmithyTask trait.
 ///
 /// # Arguments
 ///
 /// * `$task_struct` - The struct that implements `SmithyTask`
-/// * `$task_type` - String literal identifying the task type
 ///
 /// # Examples
 ///
@@ -647,7 +684,7 @@ macro_rules! forge_task_with_config {
 /// use smithyq::prelude::*;
 /// use serde::{Deserialize, Serialize};
 ///
-/// #[derive(Debug, Serialize, Deserialize)]
+/// #[derive(Debug, Serialize, Deserialize, Default)]
 /// struct MyTask {
 ///     data: String,
 /// }
@@ -657,25 +694,26 @@ macro_rules! forge_task_with_config {
 ///     type Output = String;
 ///     
 ///     async fn forge(self) -> SmithyResult<Self::Output> {
-///         Ok(format!("Email sent to {}", self.to))
+///         Ok(format!("Processed: {}", self.data))
 ///     }
 /// }
 ///
-/// // Register the task
-/// forge_task!(MyTask, "my_task");
+/// // Register the task - task_type is automatic!
+/// forge_task!(MyTask);
 ///
 /// // This generates:
 /// // - MyTaskExecutor struct
 /// // - MyTaskCaller struct  
-/// // - register_my_task() function
+/// // - auto_register_my_task() function
+/// // - Automatic registration on startup
 /// ```
 #[macro_export]
 macro_rules! forge_task {
-    ($task_struct:ident, $task_type:literal) => {
-        $crate::forge_task_with_config!($task_struct, $task_type, {});
+    ($task_struct:ident) => {
+        $crate::forge_task_with_config!($task_struct, {});
     };
-    ($task_struct:ident, $task_type:literal, { $($config:tt)* }) => {
-        $crate::forge_task_with_config!($task_struct, $task_type, { $($config)* });
+    ($task_struct:ident, { $($config:tt)* }) => {
+        $crate::forge_task_with_config!($task_struct, { $($config)* });
     };
 }
 
@@ -686,7 +724,7 @@ mod tests {
     use serde::{Deserialize, Serialize};
     use std::time::Duration;
 
-    #[derive(Debug, Serialize, Deserialize)]
+    #[derive(Debug, Serialize, Deserialize, Default)]
     struct TestTask {
         data: String,
     }
@@ -698,12 +736,17 @@ mod tests {
         async fn forge(self) -> SmithyResult<Self::Output> {
             Ok(format!("Processed: {}", self.data))
         }
+
+        // Override per avere un task_type personalizzato nei test
+        fn task_type(&self) -> &'static str {
+            "test_task"
+        }
     }
 
     // Test the basic forge_task! macro
-    forge_task!(TestTask, "test_task");
+    forge_task!(TestTask);
 
-    #[derive(Debug, Serialize, Deserialize)]
+    #[derive(Debug, Serialize, Deserialize, Default)]
     struct AdvancedTask {
         value: i32,
     }
@@ -715,10 +758,15 @@ mod tests {
         async fn forge(self) -> SmithyResult<Self::Output> {
             Ok(self.value * 2)
         }
+
+        // Override per avere un task_type personalizzato nei test
+        fn task_type(&self) -> &'static str {
+            "advanced_task"
+        }
     }
 
     // Test the advanced forge_task! macro with configuration
-    forge_task!(AdvancedTask, "advanced_task", {
+    forge_task!(AdvancedTask, {
         description = "A task that doubles a value",
         estimated_duration = Duration::from_millis(100),
         cpu_intensive = true,
@@ -730,6 +778,24 @@ mod tests {
         concurrent = false,
         rate_limit = 10,
     });
+
+    #[derive(Debug, Serialize, Deserialize, Default)]
+    struct AutoTypeTask {
+        name: String,
+    }
+
+    #[async_trait]
+    impl SmithyTask for AutoTypeTask {
+        type Output = String;
+
+        async fn forge(self) -> SmithyResult<Self::Output> {
+            Ok(format!("Auto task: {}", self.name))
+        }
+
+        // Usa il default del trait (type_name)
+    }
+
+    forge_task!(AutoTypeTask);
 
     #[tokio::test]
     async fn test_registry_registration() {
@@ -804,6 +870,42 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_auto_type_task() {
+        let registry = TaskRegistry::new();
+        registry
+            .register_executor(Box::new(AutoTypeTaskExecutor))
+            .await;
+        registry.register_caller(Box::new(AutoTypeTaskCaller)).await;
+
+        // Il task_type dovrebbe essere il nome completo del tipo
+        let expected_type = std::any::type_name::<AutoTypeTask>();
+        assert!(registry.is_registered(expected_type).await);
+    }
+
+    #[tokio::test]
+    async fn test_task_type_override() {
+        // TestTask ha un override del task_type
+        let executor = TestTaskExecutor;
+        assert_eq!(executor.task_type(), "test_task");
+
+        let caller = TestTaskCaller;
+        assert_eq!(caller.task_type(), "test_task");
+    }
+
+    #[tokio::test]
+    async fn test_task_caller_functionality() {
+        let caller = TestTaskCaller::new();
+        let test_task = TestTask {
+            data: "test data".to_string(),
+        };
+
+        let queued_task = caller.call(test_task).await.unwrap();
+        assert_eq!(queued_task.task_type, "test_task");
+        assert_eq!(queued_task.status, TaskStatus::Pending);
+        assert_eq!(queued_task.retry_count, 0);
+    }
+
+    #[tokio::test]
     async fn test_registry_summary() {
         let registry = TaskRegistry::new();
         registry.register_executor(Box::new(TestTaskExecutor)).await;
@@ -841,5 +943,19 @@ mod tests {
             }
             _ => panic!("Expected TaskNotFound error"),
         }
+    }
+
+    #[tokio::test]
+    async fn test_auto_registration_system() {
+        // Test che il sistema di auto-registrazione funzioni
+        execute_auto_registrations().await;
+
+        let registry = get_registry();
+        // Dopo l'auto-registrazione, dovremmo avere i task registrati
+        let types = registry.get_registered_types().await;
+        assert!(
+            !types.is_empty(),
+            "Auto-registration should register some tasks"
+        );
     }
 }

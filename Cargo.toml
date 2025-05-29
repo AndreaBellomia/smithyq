@@ -41,6 +41,7 @@ sqlx = { version = "0.8.6", features = [
 prometheus = { version = "0.14.0", optional = true }
 chrono = { version = "0.4.41", features = ["serde"], optional = true }
 num_cpus = "1.16.0"
+ctor = "0.4.2"
 
 [features]
 redis = ["dep:redis"]

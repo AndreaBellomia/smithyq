@@ -99,7 +99,7 @@ impl Worker {
         worker_ready_tx: mpsc::Sender<WorkerRequest>,
         death_tx: mpsc::Sender<DeadWorker>,
     ) -> WorkerDeathCause {
-        tracing::info!("🔨 Worker {} starting forge", self.id);
+        tracing::info!("Worker {} starting forge", self.id);
 
         let mut empty_count = 0u32;
         let worker_id = self.id;
@@ -119,7 +119,7 @@ impl Worker {
                 .await
                 .is_err()
             {
-                tracing::warn!("🔨 Worker {}: dispatcher timeout, shutting down", worker_id);
+                tracing::warn!("Worker {}: dispatcher timeout, shutting down", worker_id);
                 break WorkerDeathCause::Timeout;
             }
 
@@ -130,7 +130,7 @@ impl Worker {
                     empty_count = 0;
                     let task_id = task.id.clone();
 
-                    tracing::info!("🔨 Worker {} forging task {}", worker_id, task_id);
+                    tracing::info!("Worker {} forging task {}", worker_id, task_id);
 
                     let start_time = std::time::Instant::now();
                     let task_result = self.execute_task(task).await;
@@ -142,19 +142,19 @@ impl Worker {
                     match task_result {
                         TaskResult::Success => {
                             tracing::info!(
-                                "🔨 Worker {} completed task {} in {:?}",
+                                "Worker {} completed task {} in {:?}",
                                 worker_id,
                                 task_id,
                                 duration
                             );
                         }
                         TaskResult::Timeout => {
-                            tracing::error!("🔨 Worker {} task {} timed out", worker_id, task_id);
+                            tracing::error!("Worker {} task {} timed out", worker_id, task_id);
                             break WorkerDeathCause::TaskTimeout;
                         }
                         TaskResult::Panic(error) => {
                             tracing::error!(
-                                "🔨 Worker {} task {} panicked: {}",
+                                "Worker {} task {} panicked: {}",
                                 worker_id,
                                 task_id,
                                 error
@@ -169,21 +169,21 @@ impl Worker {
                     let backoff_ms = calculate_backoff(empty_count, worker_id as u64);
 
                     tracing::debug!(
-                        "🔨 Worker {} no tasks available, backing off {}ms",
+                        "Worker {} no tasks available, backing off {}ms",
                         worker_id,
                         backoff_ms
                     );
                     sleep(Duration::from_millis(backoff_ms)).await;
                 }
                 Ok(Err(_)) | Err(_) => {
-                    tracing::error!("🔨 Worker {} communication error, shutting down", worker_id);
+                    tracing::error!("Worker {} communication error, shutting down", worker_id);
                     break WorkerDeathCause::CommunicationError;
                 }
             }
         };
 
         tracing::info!(
-            "🔨 Worker {} finished with cause: {:?}",
+            "Worker {} finished with cause: {:?}",
             worker_id,
             death_cause
         );
@@ -212,11 +212,7 @@ impl Worker {
         let task_type = task.task_type.clone();
 
         let handle = tokio::spawn(async move {
-            tracing::debug!(
-                "🔨 Executing task {} of type {}",
-                task_id.clone(),
-                task_type
-            );
+            tracing::debug!("Executing task {} of type {}", task_id.clone(), task_type);
 
             let registry = get_registry();
             registry.execute_task(&task).await
@@ -224,22 +220,22 @@ impl Worker {
 
         match timeout(timeout_duration, handle).await {
             Ok(Ok(Ok(_result))) => {
-                tracing::debug!("🔨 Task {} executed successfully", task_id_clone);
+                tracing::debug!("Task {} executed successfully", task_id_clone);
                 TaskResult::Success
             }
             Ok(Ok(Err(error))) => {
                 let error_msg = error.to_string();
-                tracing::error!("🔨 Task {} failed: {}", task_id_clone, error_msg);
+                tracing::error!("Task {} failed: {}", task_id_clone, error_msg);
                 TaskResult::Panic(error_msg)
             }
             Ok(Err(join_error)) => {
                 let error_msg = format!("Task panicked: {}", join_error);
-                tracing::error!("🔨 Task {} panicked: {}", task_id_clone, join_error);
+                tracing::error!("Task {} panicked: {}", task_id_clone, join_error);
                 TaskResult::Panic(error_msg)
             }
             Err(_) => {
                 tracing::error!(
-                    "🔨 Task {} timed out after {:?}",
+                    "Task {} timed out after {:?}",
                     task_id_clone,
                     timeout_duration
                 );
@@ -353,7 +349,7 @@ impl WorkerManager {
         let mut handles = self.worker_handles.lock().await;
         handles.push(handle);
 
-        tracing::debug!("🔨 Spawned worker {}", worker_id);
+        tracing::debug!("Spawned worker {}", worker_id);
         Ok(())
     }
 
@@ -375,7 +371,7 @@ impl WorkerManager {
         }
 
         tracing::info!(
-            "🔨 Shutting down {} workers with timeout {:?}",
+            "Shutting down {} workers with timeout {:?}",
             handles.len(),
             timeout_duration
         );
@@ -386,21 +382,21 @@ impl WorkerManager {
         for (i, handle) in handles.into_iter().enumerate() {
             match timeout(timeout_duration, handle).await {
                 Ok(Ok(_)) => {
-                    tracing::debug!("🔨 Worker handle {} shut down cleanly", i);
+                    tracing::debug!("Worker handle {} shut down cleanly", i);
                 }
                 Ok(Err(e)) => {
                     error_count += 1;
-                    tracing::error!("🔨 Worker handle {} error: {}", i, e);
+                    tracing::error!("Worker handle {} error: {}", i, e);
                 }
                 Err(_) => {
                     timeout_count += 1;
-                    tracing::warn!("🔨 Worker handle {} timed out", i);
+                    tracing::warn!("Worker handle {} timed out", i);
                 }
             }
         }
 
         let result = format!("{} errors, {} timeouts", error_count, timeout_count);
-        tracing::info!("🔨 Worker shutdown complete: {}", result);
+        tracing::info!("Worker shutdown complete: {}", result);
         Ok(result)
     }
 
