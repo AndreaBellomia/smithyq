@@ -36,6 +36,8 @@ smithyq = { version = "0.1", features = ["postgres-queue"] }
 # For all features
 smithyq = { version = "0.1", features = ["full"] }
 
+```
+
 
 ## 🛣️ Roadmap - Upcoming Features
 
