@@ -24,7 +24,7 @@ forge_task!(PingTask);
 async fn main() -> SmithyResult<()> {
     tracing_subscriber::fmt::init();
 
-    let smithy = Smithy::new(SmithyConfig::default()).await?;
+    let smithy = SmithyQ::new(SmithyConfig::default()).await?;
 
     smithy.start_forging().await?;
 

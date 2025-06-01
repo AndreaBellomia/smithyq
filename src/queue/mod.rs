@@ -15,7 +15,7 @@
 //!
 //! // Redis queue (requires redis-queue feature)
 //! # #[cfg(feature = "redis-queue")]
-//! let queue = RedisQueue::new("redis://localhost:6379").await?;
+//! let queue = RedisQueue::new("redis://localhost:6379", QueueConfig::default()).await?;
 //!
 //! // PostgreSQL queue (requires postgres-queue feature)
 //! # #[cfg(feature = "postgres-queue")]
@@ -39,13 +39,13 @@ pub mod redis;
 #[cfg_attr(docsrs, doc(cfg(feature = "redis-queue")))]
 pub use redis::RedisQueue;
 
-#[cfg(feature = "postgres-queue")]
-#[cfg_attr(docsrs, doc(cfg(feature = "postgres-queue")))]
-pub mod postgres;
+// #[cfg(feature = "postgres-queue")]
+// #[cfg_attr(docsrs, doc(cfg(feature = "postgres-queue")))]
+// pub mod postgres;
 
-#[cfg(feature = "postgres-queue")]
-#[cfg_attr(docsrs, doc(cfg(feature = "postgres-queue")))]
-pub use postgres::PostgresQueue;
+// #[cfg(feature = "postgres-queue")]
+// #[cfg_attr(docsrs, doc(cfg(feature = "postgres-queue")))]
+// pub use postgres::PostgresQueue;
 
 /// Statistics about the queue state
 #[derive(Debug, Clone)]
@@ -138,13 +138,13 @@ impl QueueFactory {
         Ok(Box::new(queue))
     }
 
-    /// Create a PostgreSQL queue
-    #[cfg(feature = "postgres-queue")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "postgres-queue")))]
-    pub async fn postgres(connection_string: &str, config: QueueConfig) -> SmithyResult<TaskQueue> {
-        let queue = PostgresQueue::new(connection_string, config).await?;
-        Ok(Box::new(queue))
-    }
+    // /// Create a PostgreSQL queue
+    // #[cfg(feature = "postgres-queue")]
+    // #[cfg_attr(docsrs, doc(cfg(feature = "postgres-queue")))]
+    // pub async fn postgres(connection_string: &str, config: QueueConfig) -> SmithyResult<TaskQueue> {
+    //     let queue = PostgresQueue::new(connection_string, config).await?;
+    //     Ok(Box::new(queue))
+    // }
 }
 
 #[cfg(test)]

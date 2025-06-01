@@ -37,14 +37,14 @@ pub use worker::{Worker, WorkerManager, WorkerRequest, WorkerStats};
 ///     Ok(())
 /// }
 /// ```
-pub struct Smithy {
+pub struct SmithyQ {
     engine: Arc<RwLock<Option<SmithyEngine>>>,
     queue: Arc<dyn QueueBackend>,
     config: SmithyConfig,
     is_running: Arc<RwLock<bool>>,
 }
 
-impl Smithy {
+impl SmithyQ {
     /// Create a new Smithy with the given configuration.
     pub async fn new(config: SmithyConfig) -> SmithyResult<Self> {
         let queue = QueueFactory::in_memory(config.queue.clone());
@@ -105,27 +105,27 @@ impl Smithy {
         })
     }
 
-    /// Create a Smithy with PostgreSQL queue backend.
-    #[cfg(feature = "postgres-queue")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "postgres-queue")))]
-    pub async fn with_postgres(connection_string: &str) -> SmithyResult<Self> {
-        let config = SmithyConfig::default();
-        let queue = QueueFactory::postgres(connection_string, config.queue.clone()).await?;
+    // /// Create a Smithy with PostgreSQL queue backend.
+    // #[cfg(feature = "postgres-queue")]
+    // #[cfg_attr(docsrs, doc(cfg(feature = "postgres-queue")))]
+    // pub async fn with_postgres(connection_string: &str) -> SmithyResult<Self> {
+    //     let config = SmithyConfig::default();
+    //     let queue = QueueFactory::postgres(connection_string, config.queue.clone()).await?;
 
-        tracing::debug!("Executing auto-registrations...");
-        execute_auto_registrations().await;
+    //     tracing::debug!("Executing auto-registrations...");
+    //     execute_auto_registrations().await;
 
-        let registry = get_registry();
-        let registered_types = registry.get_registered_types().await;
-        tracing::info!("Registered task types: {:?}", registered_types);
+    //     let registry = get_registry();
+    //     let registered_types = registry.get_registered_types().await;
+    //     tracing::info!("Registered task types: {:?}", registered_types);
 
-        Ok(Self {
-            engine: Arc::new(RwLock::new(None)),
-            queue: Arc::from(queue),
-            config,
-            is_running: Arc::new(RwLock::new(false)),
-        })
-    }
+    //     Ok(Self {
+    //         engine: Arc::new(RwLock::new(None)),
+    //         queue: Arc::from(queue),
+    //         config,
+    //         is_running: Arc::new(RwLock::new(false)),
+    //     })
+    // }
 
     /// Start the smithy forging process (begin processing tasks).
     ///
@@ -274,7 +274,7 @@ impl Smithy {
     }
 }
 
-impl Drop for Smithy {
+impl Drop for SmithyQ {
     fn drop(&mut self) {
         // Note: We can't call async methods in Drop, so we just log a warning
         // if the smithy is still running. Users should call stop_forging() explicitly.
@@ -306,13 +306,13 @@ mod tests {
 
     #[tokio::test]
     async fn test_smithy_creation() {
-        let smithy = Smithy::new(SmithyConfig::default()).await.unwrap();
+        let smithy = SmithyQ::new(SmithyConfig::default()).await.unwrap();
         assert!(!smithy.is_forging().await);
     }
 
     #[tokio::test]
     async fn test_task_enqueue() {
-        let smithy = Smithy::new(SmithyConfig::default()).await.unwrap();
+        let smithy = SmithyQ::new(SmithyConfig::default()).await.unwrap();
 
         let task = TestTask {
             data: "test".to_string(),
@@ -330,7 +330,7 @@ mod tests {
         let mut config = SmithyConfig::default();
         config.workers.num_workers = 1; // Single worker for test
 
-        let smithy = Smithy::new(config).await.unwrap();
+        let smithy = SmithyQ::new(config).await.unwrap();
 
         // Should not be running initially
         assert!(!smithy.is_forging().await);

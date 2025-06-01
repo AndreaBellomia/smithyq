@@ -55,13 +55,13 @@ pub mod queue;
 pub mod task;
 pub mod utils;
 
-#[cfg(feature = "metrics")]
-#[cfg_attr(docsrs, doc(cfg(feature = "metrics")))]
-pub mod metrics;
+// #[cfg(feature = "metrics")]
+// #[cfg_attr(docsrs, doc(cfg(feature = "metrics")))]
+// pub mod metrics;
 
 pub mod prelude {
     pub use crate::config::*;
-    pub use crate::core::Smithy;
+    pub use crate::core::SmithyQ;
     pub use crate::core::registry::{TaskCaller, TaskExecutor, TaskPriority, get_registry};
     pub use crate::error::{SmithyError, SmithyResult};
     pub use crate::forge_task;
@@ -69,13 +69,13 @@ pub mod prelude {
     pub use crate::task::{QueuedTask, SmithyTask, TaskId, TaskStatus};
     pub use async_trait::async_trait;
 
-    #[cfg(feature = "metrics")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "metrics")))]
-    pub use crate::metrics::SmithyMetrics;
+    // #[cfg(feature = "metrics")]
+    // #[cfg_attr(docsrs, doc(cfg(feature = "metrics")))]
+    // pub use crate::metrics::SmithyMetrics;
 }
 
 pub use crate::config::*;
-pub use crate::core::Smithy;
+pub use crate::core::SmithyQ;
 pub use crate::core::registry::{TaskCaller, TaskExecutor, TaskPriority, get_registry};
 pub use crate::error::{SmithyError, SmithyResult};
 pub use crate::queue::{QueueBackend, TaskQueue};
